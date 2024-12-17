@@ -31,20 +31,23 @@ const RealTimeOCR = () => {
       const context = canvas.getContext("2d");
 
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Set canvas size to match video dimensions
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
+        // Draw the video frame on the canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+        // Get the frame as an image
         const dataURL = canvas.toDataURL("image/png");
 
-        // Perform OCR and also get bounding boxes for detected text
+        // Perform OCR and get bounding boxes
         Tesseract.recognize(dataURL, "eng", { logger: (m) => console.log(m) })
           .then(({ data: { text, words } }) => {
             setText(text);
 
-            // Extract bounding boxes for object detection (text locations)
-            const detectedBoxes = words.map(word => ({
+            // Extract bounding boxes
+            const detectedBoxes = words.map((word) => ({
               text: word.text,
               x: word.bbox.x0,
               y: word.bbox.y0,
@@ -52,6 +55,15 @@ const RealTimeOCR = () => {
               height: word.bbox.y1 - word.bbox.y0,
             }));
             setBoxes(detectedBoxes);
+
+            // Clear previous boxes and draw new ones
+            detectedBoxes.forEach((box) => {
+              context.beginPath();
+              context.rect(box.x, box.y, box.width, box.height);
+              context.lineWidth = 2;
+              context.strokeStyle = "red";
+              context.stroke();
+            });
           })
           .catch((error) => {
             console.error("Tesseract OCR Error:", error);
@@ -68,7 +80,7 @@ const RealTimeOCR = () => {
       processFrame();
     }
 
-    // Cleanup function
+    // Cleanup on component unmount or when scanning stops
     return () => {
       if (stream) {
         const tracks = stream.getTracks();
@@ -85,8 +97,6 @@ const RealTimeOCR = () => {
 
   return (
     <div className="bg-white text-black">
-      <video ref={videoRef} style={{ display: "none" }} />
-      <canvas ref={canvasRef} style={{ display: "none" }} />
       <div>
         <button
           onClick={toggleScan}
@@ -96,27 +106,28 @@ const RealTimeOCR = () => {
         </button>
         <h2>Detected Text:</h2>
         <p>{text}</p>
+      </div>
 
-        {/* Render bounding boxes for object detection */}
-        <div style={{ position: "relative", marginTop: "20px" }}>
-          <canvas
-            ref={(canvas) => {
-              if (canvas) {
-                const context = canvas.getContext("2d");
-                boxes.forEach((box) => {
-                  context.beginPath();
-                  context.rect(box.x, box.y, box.width, box.height);
-                  context.lineWidth = 2;
-                  context.strokeStyle = "red";
-                  context.stroke();
-                });
-              }
-            }}
-            width={videoRef.current?.videoWidth}
-            height={videoRef.current?.videoHeight}
-            style={{ position: "absolute", top: 0, left: 0 }}
-          />
-        </div>
+      {/* Video and canvas container */}
+      <div style={{ position: "relative", marginTop: "20px" }}>
+        <video
+          ref={videoRef}
+          style={{
+            display: isScanning ? "block" : "none",
+            width: "100%",
+            maxWidth: "640px",
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            maxWidth: "640px",
+          }}
+        />
       </div>
     </div>
   );
