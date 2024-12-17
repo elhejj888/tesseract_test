@@ -7,7 +7,7 @@ const RealTimeOCR = () => {
   const canvasRef = useRef(null);
   const [text, setText] = useState("");
   const [isScanning, setIsScanning] = useState(false);
-  const [boxes, setBoxes] = useState([]); // Store bounding boxes for object detection
+  const [boxes, setBoxes] = useState([]);
 
   useEffect(() => {
     let stream;
@@ -15,7 +15,9 @@ const RealTimeOCR = () => {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
+            video: {
+              facingMode: "environment", // Use the back camera
+            },
           });
           videoRef.current.srcObject = stream;
           videoRef.current.play();
@@ -31,22 +33,17 @@ const RealTimeOCR = () => {
       const context = canvas.getContext("2d");
 
       if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        // Set canvas size to match video dimensions
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
-        // Draw the video frame on the canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Get the frame as an image
         const dataURL = canvas.toDataURL("image/png");
 
-        // Perform OCR and get bounding boxes
         Tesseract.recognize(dataURL, "eng", { logger: (m) => console.log(m) })
           .then(({ data: { text, words } }) => {
             setText(text);
 
-            // Extract bounding boxes
             const detectedBoxes = words.map((word) => ({
               text: word.text,
               x: word.bbox.x0,
@@ -56,7 +53,6 @@ const RealTimeOCR = () => {
             }));
             setBoxes(detectedBoxes);
 
-            // Clear previous boxes and draw new ones
             detectedBoxes.forEach((box) => {
               context.beginPath();
               context.rect(box.x, box.y, box.width, box.height);
@@ -80,7 +76,6 @@ const RealTimeOCR = () => {
       processFrame();
     }
 
-    // Cleanup on component unmount or when scanning stops
     return () => {
       if (stream) {
         const tracks = stream.getTracks();
@@ -91,8 +86,8 @@ const RealTimeOCR = () => {
 
   const toggleScan = () => {
     setIsScanning((prev) => !prev);
-    setText(""); // Clear text when scanning is toggled off
-    setBoxes([]); // Clear detected boxes when scanning is toggled off
+    setText("");
+    setBoxes([]);
   };
 
   return (
@@ -108,7 +103,6 @@ const RealTimeOCR = () => {
         <p>{text}</p>
       </div>
 
-      {/* Video and canvas container */}
       <div style={{ position: "relative", marginTop: "20px" }}>
         <video
           ref={videoRef}
